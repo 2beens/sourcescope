@@ -19,13 +19,14 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"os"
+	"os/exec"
+	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
 
 var cfgFile string
-var sourcePath string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -45,7 +46,32 @@ func Execute() {
 		os.Exit(1)
 	}
 
-	fmt.Println("finished ...")
+	changedFilesList := getChangedFiles()
+
+	// TODO:
+	// 1 - get changed files list
+	// 2 - remove file-name.go from files list
+
+	// 3 - iterate all source files of backend
+	// 4 - check import - is current changed package used/imported there ?
+
+	fmt.Println(changedFilesList)
+	fmt.Println("finished ... ")
+}
+
+func getChangedFiles() []string {
+	var changedFilesListRaw []byte
+	var err error
+
+	cmd := exec.Command( "git", "diff", "--name-only", "master")
+	if changedFilesListRaw, err = cmd.Output(); err != nil {
+		panic(err.Error())
+	}
+
+	changedFiles := string(changedFilesListRaw)
+	fmt.Println(changedFiles)
+
+	return strings.Split(changedFiles, "\n")
 }
 
 func init() {
@@ -56,17 +82,6 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.sourcescope.yaml)")
-
-	viper.SetConfigType("yaml")
-	viper.SetConfigName(".sourcescope.yaml")
-	viper.AddConfigPath(".")
-	err := viper.ReadInConfig() // Find and read the config file
-	if err != nil { // Handle errors reading the config file
-		panic(fmt.Errorf("Fatal error config file: %s \n", err))
-	}
-
-	sourcePath = viper.GetString("path")
-	fmt.Println("source path: " + sourcePath)
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
