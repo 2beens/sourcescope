@@ -46,16 +46,18 @@ func Execute() {
 		os.Exit(1)
 	}
 
-	changedFilesList := getChangedFiles()
 
 	// TODO:
 	// 1 - get changed files list
+	changedFilesList := getChangedFiles()
 	// 2 - remove file-name.go from files list
+	changedPackages := getChangedPackages(changedFilesList)
 
 	// 3 - iterate all source files of backend
 	// 4 - check import - is current changed package used/imported there ?
 
-	fmt.Println(changedFilesList)
+	fmt.Println("changed packages:")
+	fmt.Println(changedPackages)
 	fmt.Println("finished ... ")
 }
 
@@ -72,6 +74,31 @@ func getChangedFiles() []string {
 	fmt.Println(changedFiles)
 
 	return strings.Split(changedFiles, "\n")
+}
+
+func getChangedPackages(changedFiles []string) []string {
+	changedPackages := make(map[string]struct{})
+	for _, f := range changedFiles {
+		changedFileParts := strings.Split(f, "/")
+		var sb strings.Builder
+		for _, p := range changedFileParts {
+			if strings.HasSuffix(p, ".go") {
+				continue
+			}
+			if sb.Len() > 0 {
+				sb.WriteString("/")
+			}
+			sb.WriteString(p)
+		}
+		changedPackages[sb.String()] = struct{}{}
+	}
+
+	var changedPackagesList []string
+	for p := range changedPackages {
+		changedPackagesList = append(changedPackagesList, p)
+	}
+
+	return changedPackagesList
 }
 
 func init() {
