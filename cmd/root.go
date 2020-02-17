@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -31,6 +32,8 @@ import (
 )
 
 var cfgFile string
+// TODO: make configurable
+var mainSourcePathPrefix = "github.com/adjust/backend"
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -50,9 +53,9 @@ func Execute() {
 		os.Exit(1)
 	}
 
-	// TODO:
 	// 1 - get changed files list
 	changedFilesList := getChangedFiles()
+
 	// 2 - remove file-name.go from files list
 	changedPackages := getChangedPackages(changedFilesList)
 
@@ -62,11 +65,12 @@ func Execute() {
 	// 4 - check import - is current changed package used/imported there ?
 	dependentPackages := getDependentPackages(changedPackages, goFiles)
 
-	fmt.Println("changed packages:")
+	fmt.Println("\nchanged packages:")
 	fmt.Println(changedPackages)
-	fmt.Println("dependent packages:")
-	fmt.Println(dependentPackages)
-	fmt.Println("finished ... ")
+	fmt.Println("\ndependent packages:")
+	for _, p := range dependentPackages {
+		fmt.Println(p)
+	}
 }
 
 func getChangedFiles() []string {
@@ -140,7 +144,6 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 		if err != nil {
 			panic(err)
 		}
-		//fmt.Printf("node [%d][%s]: %d imports\n\n", node.Package, node.Name.Name, len(node.Imports))
 		if sourceImported, importPath := nodeContainsAnyImport(node, changedPackages); sourceImported {
 			dependentPackages[importPath] = struct{}{}
 		}
@@ -151,14 +154,15 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 		dependentPackagesList = append(dependentPackagesList, ds)
 	}
 
+	sort.Strings(dependentPackagesList)
 	return dependentPackagesList
 }
 
 func nodeContainsAnyImport(node *ast.File, changedPackages []string) (bool, string) {
 	for _, i := range node.Imports {
 		for _, changedPackage := range changedPackages {
-			if strings.Contains(i.Path.Value, changedPackage) {
-				return true, i.Path.Value
+			if strings.Contains(i.Path.Value, changedPackage) && strings.HasPrefix(i.Path.Value, `"` + mainSourcePathPrefix) {
+				return true, i.Path.Value[1:len(i.Path.Value)]
 			}
 		}
 	}
