@@ -18,6 +18,9 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,14 +57,15 @@ func Execute() {
 	changedPackages := getChangedPackages(changedFilesList)
 
 	// 3 - iterate all source files of backend
-	fmt.Println("go files:")
 	goFiles := getSourceGoFiles()
-	fmt.Println(goFiles)
 
 	// 4 - check import - is current changed package used/imported there ?
+	dependentPackages := getDependentPackages(changedPackages, goFiles)
 
 	fmt.Println("changed packages:")
 	fmt.Println(changedPackages)
+	fmt.Println("dependent packages:")
+	fmt.Println(dependentPackages)
 	fmt.Println("finished ... ")
 }
 
@@ -74,8 +78,15 @@ func getChangedFiles() []string {
 		panic(err.Error())
 	}
 
-	changedFiles := string(changedFilesListRaw)
-	return strings.Split(changedFiles, "\n")
+	changedFiles := strings.Split(string(changedFilesListRaw), "\n")
+	var changedFilesFiltered []string
+	for _, f := range changedFiles {
+		if len(f) > 0 {
+			changedFilesFiltered = append(changedFilesFiltered, f)
+		}
+	}
+
+	return changedFilesFiltered
 }
 
 func getChangedPackages(changedFiles []string) []string {
@@ -121,12 +132,37 @@ func getSourceGoFiles() []string {
 	return goFiles
 }
 
-func getDependentSources(goSources []string) []string {
-	dependentSources := []string
+func getDependentPackages(changedPackages []string, goSources []string) []string {
+	dependentPackages := make(map[string]struct{})
+	fset := token.NewFileSet()
+	for _, sourcePath := range goSources {
+		node, err := parser.ParseFile(fset, sourcePath, nil, parser.ImportsOnly)
+		if err != nil {
+			panic(err)
+		}
+		//fmt.Printf("node [%d][%s]: %d imports\n\n", node.Package, node.Name.Name, len(node.Imports))
+		if nodeContainsAnyImport(node, changedPackages) {
+			dependentPackages[node.Name.Name] = struct{}{}
+		}
+	}
 
-	
+	var dependentPackagesList []string
+	for ds := range dependentPackages {
+		dependentPackagesList = append(dependentPackagesList, ds)
+	}
 
-	return dependentSources
+	return dependentPackagesList
+}
+
+func nodeContainsAnyImport(node *ast.File, changedPackages []string) bool {
+	for _, i := range node.Imports {
+		for _, changedPackage := range changedPackages {
+			if strings.Contains(i.Path.Value, changedPackage) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func init() {
