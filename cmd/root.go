@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -46,7 +47,6 @@ func Execute() {
 		os.Exit(1)
 	}
 
-
 	// TODO:
 	// 1 - get changed files list
 	changedFilesList := getChangedFiles()
@@ -54,6 +54,10 @@ func Execute() {
 	changedPackages := getChangedPackages(changedFilesList)
 
 	// 3 - iterate all source files of backend
+	fmt.Println("go files:")
+	goFiles := getSourceGoFiles()
+	fmt.Println(goFiles)
+
 	// 4 - check import - is current changed package used/imported there ?
 
 	fmt.Println("changed packages:")
@@ -71,8 +75,6 @@ func getChangedFiles() []string {
 	}
 
 	changedFiles := string(changedFilesListRaw)
-	fmt.Println(changedFiles)
-
 	return strings.Split(changedFiles, "\n")
 }
 
@@ -99,6 +101,32 @@ func getChangedPackages(changedFiles []string) []string {
 	}
 
 	return changedPackagesList
+}
+
+func getSourceGoFiles() []string {
+	var goFiles []string
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if strings.HasPrefix(path,"vendor") {
+			return nil
+		}
+		if filepath.Ext(path) != ".go" {
+			return nil
+		}
+		goFiles = append(goFiles, path)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+	return goFiles
+}
+
+func getDependentSources(goSources []string) []string {
+	dependentSources := []string
+
+	
+
+	return dependentSources
 }
 
 func init() {
