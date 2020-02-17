@@ -161,6 +161,13 @@ func getSourceGoFiles() []string {
 }
 
 func getDependentPackages(changedPackages []string, goSources []string) []string {
+	var changedPackagesFiltered []string
+	for _, p := range changedPackages {
+		if !isChangedFileExcluded(p) {
+			changedPackagesFiltered = append(changedPackagesFiltered, p)
+		}
+	}
+
 	dependentPackages := make(map[string]struct{})
 	fset := token.NewFileSet()
 	for _, sourcePath := range goSources {
@@ -169,7 +176,7 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 			panic(err)
 		}
 
-		if sourceImported := nodeContainsAnyImport(node, changedPackages); sourceImported {
+		if sourceImported := nodeContainsAnyImport(node, changedPackagesFiltered); sourceImported {
 			sourcePackage := getPackageBySourceFile(sourcePath)
 			dependentPackages[sourcePackage] = struct{}{}
 		}
@@ -187,10 +194,6 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 func nodeContainsAnyImport(node *ast.File, changedPackages []string) bool {
 	for _, i := range node.Imports {
 		for _, changedPackage := range changedPackages {
-			if isChangedFileExcluded(changedPackage) {
-				// TODO: do this filtering outside in the caller only once - in getDependentPackages()
-				continue
-			}
 			if strings.Contains(i.Path.Value, changedPackage) && strings.HasPrefix(i.Path.Value, `"` + mainSourcePathPrefix) {
 				return true
 			}
