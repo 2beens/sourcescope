@@ -34,6 +34,7 @@ import (
 var cfgFile string
 // TODO: make configurable
 var mainSourcePathPrefix = "github.com/adjust/backend"
+var excludedChangedFiles []string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -52,6 +53,9 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	// TODO: make configurable
+	excludedChangedFiles = append(excludedChangedFiles, "test")
 
 	// 1 - get changed files list
 	changedFilesList := getChangedFiles()
@@ -112,10 +116,22 @@ func getChangedPackages(changedFiles []string) []string {
 
 	var changedPackagesList []string
 	for p := range changedPackages {
+		if isChangedFileExcluded(p) {
+			continue
+		}
 		changedPackagesList = append(changedPackagesList, p)
 	}
 
 	return changedPackagesList
+}
+
+func isChangedFileExcluded(file string) bool {
+	for _, exFile := range excludedChangedFiles {
+		if exFile == file {
+			return true
+		}
+	}
+	return false
 }
 
 func getSourceGoFiles() []string {
