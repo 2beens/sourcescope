@@ -1,5 +1,5 @@
 /*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
+Copyright © 2020 Serj <stubin87@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,11 +69,14 @@ func Execute() {
 	// 4 - check import - is current changed package used/imported there ?
 	dependentPackages := getDependentPackages(changedPackages, goFiles)
 
-	fmt.Println("\nchanged packages:")
-	fmt.Println(changedPackages)
-	fmt.Println("\ndependent packages:")
+	fmt.Println("changed packages:")
+	for _, p := range changedPackages {
+		fmt.Println("*** " + p)
+	}
+	fmt.Println("")
+	fmt.Println("dependent packages:")
 	for _, p := range dependentPackages {
-		fmt.Println(p)
+		fmt.Println("+++ " + p)
 	}
 }
 
