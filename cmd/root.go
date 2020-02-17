@@ -84,7 +84,7 @@ func getChangedFiles() []string {
 	var changedFilesListRaw []byte
 	var err error
 
-	cmd := exec.Command( "git", "diff", "--name-only", "master")
+	cmd := exec.Command( "git", "diff", "--name-only", "master...")
 	if changedFilesListRaw, err = cmd.Output(); err != nil {
 		panic(err.Error())
 	}
@@ -92,7 +92,7 @@ func getChangedFiles() []string {
 	changedFiles := strings.Split(string(changedFilesListRaw), "\n")
 	var changedFilesFiltered []string
 	for _, f := range changedFiles {
-		if len(f) > 0 {
+		if len(f) > 0 && strings.HasSuffix(f, ".go") {
 			changedFilesFiltered = append(changedFilesFiltered, f)
 		}
 	}
@@ -100,31 +100,36 @@ func getChangedFiles() []string {
 	return changedFilesFiltered
 }
 
+func getPackageBySourceFile(sourceFile string) string {
+	sourceFileParts := strings.Split(sourceFile, "/")
+	var sb strings.Builder
+	for _, p := range sourceFileParts {
+		if strings.HasSuffix(p, ".go") {
+			continue
+		}
+		if sb.Len() > 0 {
+			sb.WriteString("/")
+		}
+		sb.WriteString(p)
+	}
+	return sb.String()
+}
+
 func getChangedPackages(changedFiles []string) []string {
 	changedPackages := make(map[string]struct{})
 	for _, f := range changedFiles {
-		changedFileParts := strings.Split(f, "/")
-		var sb strings.Builder
-		for _, p := range changedFileParts {
-			if strings.HasSuffix(p, ".go") {
-				continue
-			}
-			if sb.Len() > 0 {
-				sb.WriteString("/")
-			}
-			sb.WriteString(p)
-		}
-		changedPackages[sb.String()] = struct{}{}
+		changedPackages[getPackageBySourceFile(f)] = struct{}{}
 	}
 
 	var changedPackagesList []string
 	for p := range changedPackages {
-		if isChangedFileExcluded(p) {
-			continue
-		}
+		//if isChangedFileExcluded(p) {
+		//	continue
+		//}
 		changedPackagesList = append(changedPackagesList, p)
 	}
 
+	sort.Strings(changedPackagesList)
 	return changedPackagesList
 }
 
@@ -163,8 +168,10 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 		if err != nil {
 			panic(err)
 		}
-		if sourceImported, importPath := nodeContainsAnyImport(node, changedPackages); sourceImported {
-			dependentPackages[importPath] = struct{}{}
+
+		if sourceImported := nodeContainsAnyImport(node, changedPackages); sourceImported {
+			sourcePackage := getPackageBySourceFile(sourcePath)
+			dependentPackages[sourcePackage] = struct{}{}
 		}
 	}
 
@@ -177,15 +184,19 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 	return dependentPackagesList
 }
 
-func nodeContainsAnyImport(node *ast.File, changedPackages []string) (bool, string) {
+func nodeContainsAnyImport(node *ast.File, changedPackages []string) bool {
 	for _, i := range node.Imports {
 		for _, changedPackage := range changedPackages {
+			if isChangedFileExcluded(changedPackage) {
+				// TODO: do this filtering outside in the caller only once - in getDependentPackages()
+				continue
+			}
 			if strings.Contains(i.Path.Value, changedPackage) && strings.HasPrefix(i.Path.Value, `"` + mainSourcePathPrefix) {
-				return true, i.Path.Value[1:len(i.Path.Value)]
+				return true
 			}
 		}
 	}
-	return false, ""
+	return false
 }
 
 func init() {
