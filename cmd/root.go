@@ -141,8 +141,8 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 			panic(err)
 		}
 		//fmt.Printf("node [%d][%s]: %d imports\n\n", node.Package, node.Name.Name, len(node.Imports))
-		if nodeContainsAnyImport(node, changedPackages) {
-			dependentPackages[node.Name.Name] = struct{}{}
+		if sourceImported, importPath := nodeContainsAnyImport(node, changedPackages); sourceImported {
+			dependentPackages[importPath] = struct{}{}
 		}
 	}
 
@@ -154,15 +154,15 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 	return dependentPackagesList
 }
 
-func nodeContainsAnyImport(node *ast.File, changedPackages []string) bool {
+func nodeContainsAnyImport(node *ast.File, changedPackages []string) (bool, string) {
 	for _, i := range node.Imports {
 		for _, changedPackage := range changedPackages {
 			if strings.Contains(i.Path.Value, changedPackage) {
-				return true
+				return true, i.Path.Value
 			}
 		}
 	}
-	return false
+	return false, ""
 }
 
 func init() {
