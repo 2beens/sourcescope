@@ -45,6 +45,7 @@ func Execute() {
 	}
 
 	changedPackages, dependentPackages := getChangedAndDependentSources()
+	dependentPackagesRootFolders := getRootFolders(dependentPackages)
 
 	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> changed packages:")
 	for _, p := range changedPackages {
@@ -54,6 +55,11 @@ func Execute() {
 	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> dependent packages:")
 	for _, p := range dependentPackages {
 		fmt.Println("+++ " + p)
+	}
+	fmt.Println("")
+	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> dependent packages root folders:")
+	for _, f := range dependentPackagesRootFolders {
+		fmt.Println("### " + f)
 	}
 }
 

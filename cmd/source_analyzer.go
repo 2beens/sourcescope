@@ -34,12 +34,11 @@ func getChangedAndDependentSources() ([]string, []string) {
 	return changedPackages, dependentPackages
 }
 
-
 func getChangedFiles() []string {
 	var changedFilesListRaw []byte
 	var err error
 
-	cmd := exec.Command( "git", "diff", "--name-only", "master...")
+	cmd := exec.Command("git", "diff", "--name-only", "master...")
 	if changedFilesListRaw, err = cmd.Output(); err != nil {
 		panic(err.Error())
 	}
@@ -100,7 +99,7 @@ func isChangedFileExcluded(file string) bool {
 func getSourceGoFiles() []string {
 	var goFiles []string
 	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
-		if strings.HasPrefix(path,"vendor") {
+		if strings.HasPrefix(path, "vendor") {
 			return nil
 		}
 		if filepath.Ext(path) != ".go" {
@@ -146,10 +145,23 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 	return dependentPackagesList
 }
 
+func getRootFolders(packages []string) []string {
+	rootFolders := make(map[string]struct{})
+	for _, p := range packages {
+		rootFolders[strings.Split(p, "/")[0]] = struct{}{}
+	}
+	var rootFoldersList []string
+	for rf := range rootFolders {
+		rootFoldersList = append(rootFoldersList, rf)
+	}
+	sort.Strings(rootFoldersList)
+	return rootFoldersList
+}
+
 func nodeContainsAnyImport(node *ast.File, changedPackages []string) bool {
 	for _, i := range node.Imports {
 		for _, changedPackage := range changedPackages {
-			if strings.Contains(i.Path.Value, changedPackage) && strings.HasPrefix(i.Path.Value, `"` + mainSourcePathPrefix) {
+			if strings.Contains(i.Path.Value, changedPackage) && strings.HasPrefix(i.Path.Value, `"`+mainSourcePathPrefix) {
 				return true
 			}
 		}
