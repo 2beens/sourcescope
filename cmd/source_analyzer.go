@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,36 +12,48 @@ import (
 	"strings"
 )
 
-// TODO: make configurable
-var mainSourcePathPrefix = "github.com/adjust/backend"
-var excludedChangedFiles []string
+type SourceAnalyzer struct {
+	importPathPrefix     string
+	rootDir              string
+	excludedChangedFiles []string
+}
 
-func getChangedAndDependentSources() ([]string, []string) {
-	// TODO: make configurable
-	excludedChangedFiles = append(excludedChangedFiles, "test")
+func NewSourceAnalyzer(rootDir, sourcePathPrefix string) *SourceAnalyzer {
+	sourceAnalyzer := &SourceAnalyzer{
+		importPathPrefix: sourcePathPrefix,
+		rootDir:          rootDir,
+	}
 
+	sourceAnalyzer.excludedChangedFiles = []string{}
+	sourceAnalyzer.excludedChangedFiles = append(sourceAnalyzer.excludedChangedFiles, "test")
+
+	return sourceAnalyzer
+}
+
+func (sa *SourceAnalyzer) GetChangedAndDependentSources() ([]string, []string) {
 	// 1 - get changed files list
-	changedFilesList := getChangedFiles()
+	changedFilesList := sa.getChangedFiles()
 
 	// 2 - remove file-name.go from files list
-	changedPackages := getChangedPackages(changedFilesList)
+	changedPackages := sa.getChangedPackages(changedFilesList)
 
 	// 3 - iterate all source files of backend
-	goFiles := getSourceGoFiles()
+	goFiles := sa.getSourceGoFiles()
 
 	// 4 - check import - is current changed package used/imported there ?
-	dependentPackages := getDependentPackages(changedPackages, goFiles)
+	dependentPackages := sa.getDependentPackages(changedPackages, goFiles)
 
 	return changedPackages, dependentPackages
 }
 
-func getChangedFiles() []string {
+func (sa *SourceAnalyzer) getChangedFiles() []string {
 	var changedFilesListRaw []byte
 	var err error
 
 	cmd := exec.Command("git", "diff", "--name-only", "master...")
+	cmd.Dir = rootDir
 	if changedFilesListRaw, err = cmd.Output(); err != nil {
-		panic(err.Error())
+		log.Fatalf("error, check if valid git repository. %v", err)
 	}
 
 	changedFiles := strings.Split(string(changedFilesListRaw), "\n")
@@ -54,7 +67,8 @@ func getChangedFiles() []string {
 	return changedFilesFiltered
 }
 
-func getPackageBySourceFile(sourceFile string) string {
+func (sa *SourceAnalyzer) getPackageBySourceFile(sourceFile string) string {
+	sourceFile = strings.TrimPrefix(sourceFile, sa.rootDir)
 	sourceFileParts := strings.Split(sourceFile, "/")
 	var sb strings.Builder
 	for _, p := range sourceFileParts {
@@ -69,10 +83,10 @@ func getPackageBySourceFile(sourceFile string) string {
 	return sb.String()
 }
 
-func getChangedPackages(changedFiles []string) []string {
+func (sa *SourceAnalyzer) getChangedPackages(changedFiles []string) []string {
 	changedPackages := make(map[string]struct{})
 	for _, f := range changedFiles {
-		changedPackages[getPackageBySourceFile(f)] = struct{}{}
+		changedPackages[sa.getPackageBySourceFile(f)] = struct{}{}
 	}
 
 	var changedPackagesList []string
@@ -87,8 +101,8 @@ func getChangedPackages(changedFiles []string) []string {
 	return changedPackagesList
 }
 
-func isChangedFileExcluded(file string) bool {
-	for _, exFile := range excludedChangedFiles {
+func (sa *SourceAnalyzer) isChangedFileExcluded(file string) bool {
+	for _, exFile := range sa.excludedChangedFiles {
 		if exFile == file {
 			return true
 		}
@@ -96,12 +110,14 @@ func isChangedFileExcluded(file string) bool {
 	return false
 }
 
-func getSourceGoFiles() []string {
+func (sa *SourceAnalyzer) getSourceGoFiles() []string {
 	var goFiles []string
-	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(sa.rootDir, func(path string, info os.FileInfo, err error) error {
 		if strings.HasPrefix(path, "vendor") {
 			return nil
 		}
+		// TODO: other dirs like bin, third_party, etc ...
+
 		if filepath.Ext(path) != ".go" {
 			return nil
 		}
@@ -114,10 +130,10 @@ func getSourceGoFiles() []string {
 	return goFiles
 }
 
-func getDependentPackages(changedPackages []string, goSources []string) []string {
+func (sa *SourceAnalyzer) getDependentPackages(changedPackages []string, goSources []string) []string {
 	var changedPackagesFiltered []string
 	for _, p := range changedPackages {
-		if !isChangedFileExcluded(p) {
+		if !sa.isChangedFileExcluded(p) {
 			changedPackagesFiltered = append(changedPackagesFiltered, p)
 		}
 	}
@@ -130,8 +146,8 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 			panic(err)
 		}
 
-		if sourceImported := nodeContainsAnyImport(node, changedPackagesFiltered); sourceImported {
-			sourcePackage := getPackageBySourceFile(sourcePath)
+		if sourceImported := sa.nodeContainsAnyImport(node, changedPackagesFiltered); sourceImported {
+			sourcePackage := sa.getPackageBySourceFile(sourcePath)
 			dependentPackages[sourcePackage] = struct{}{}
 		}
 	}
@@ -145,7 +161,7 @@ func getDependentPackages(changedPackages []string, goSources []string) []string
 	return dependentPackagesList
 }
 
-func getRootFolders(packages []string) []string {
+func (sa *SourceAnalyzer) GetRootFolders(packages []string) []string {
 	rootFolders := make(map[string]struct{})
 	for _, p := range packages {
 		rootFolders[strings.Split(p, "/")[0]] = struct{}{}
@@ -158,10 +174,10 @@ func getRootFolders(packages []string) []string {
 	return rootFoldersList
 }
 
-func nodeContainsAnyImport(node *ast.File, changedPackages []string) bool {
+func (sa *SourceAnalyzer) nodeContainsAnyImport(node *ast.File, changedPackages []string) bool {
 	for _, i := range node.Imports {
 		for _, changedPackage := range changedPackages {
-			if strings.Contains(i.Path.Value, changedPackage) && strings.HasPrefix(i.Path.Value, `"`+mainSourcePathPrefix) {
+			if strings.Contains(i.Path.Value, changedPackage) && strings.HasPrefix(i.Path.Value, `"`+sa.importPathPrefix) {
 				return true
 			}
 		}

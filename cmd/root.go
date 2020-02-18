@@ -17,6 +17,7 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -24,17 +25,23 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	sourceAnalyzer *SourceAnalyzer
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "sourcescope",
-	Short: "Find the list of packages in need for testing",
-	Long:  `Analyze backend source for any changes and output the list of packages that require testing, depending on those changes`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	//	Run: func(cmd *cobra.Command, args []string) { },
-}
+	cfgFile          string
+	rootDir          string
+	importPathPrefix string
+
+	// rootCmd represents the base command when called without any subcommands
+	rootCmd = &cobra.Command{
+		Use:   "sourcescope",
+		Short: "Find the list of packages in need for testing",
+		Long:  `Analyze backend source for any changes and output the list of packages that require testing, depending on those changes`,
+		// Uncomment the following line if your bare application
+		// has an action associated with it:
+		//	Run: func(cmd *cobra.Command, args []string) { },
+	}
+)
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
@@ -44,19 +51,38 @@ func Execute() {
 		os.Exit(1)
 	}
 
-	changedPackages, dependentPackages := getChangedAndDependentSources()
-	dependentPackagesRootFolders := getRootFolders(dependentPackages)
+	if rootDir == "." {
+		var err error
+		rootDir, err = os.Getwd()
+		if err != nil {
+			log.Fatalf("cannot get root directory: %s", err.Error())
+		}
+	}
+	if len(rootDir) == 0 {
+		log.Fatal("invalid root dir")
+	}
+
+	rootDir = "/Users/serj/go/src/github.com/adjust/backend"
+
+	fmt.Println("source path prefix: \t" + importPathPrefix)
+	fmt.Println("root dir: \t\t" + rootDir)
+	fmt.Println()
+
+	sourceAnalyzer = NewSourceAnalyzer(rootDir, importPathPrefix)
+
+	changedPackages, dependentPackages := sourceAnalyzer.GetChangedAndDependentSources()
+	dependentPackagesRootFolders := sourceAnalyzer.GetRootFolders(dependentPackages)
 
 	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> changed packages:")
 	for _, p := range changedPackages {
 		fmt.Println("*** " + p)
 	}
-	fmt.Println("")
+	fmt.Println()
 	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> dependent packages:")
 	for _, p := range dependentPackages {
 		fmt.Println("+++ " + p)
 	}
-	fmt.Println("")
+	fmt.Println()
 	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> dependent packages root folders:")
 	for _, f := range dependentPackagesRootFolders {
 		fmt.Println("### " + f)
@@ -65,16 +91,20 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.sourcescope.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.PersistentFlags().StringVarP(
+		&importPathPrefix,
+		"prefix",
+		"p",
+		"github.com/adjust/backend", // default value
+		"import path prefix (e.g. github.com/username/projectname), needed when determining if changed packages are being imported in others",
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&rootDir,
+		"rootdir",
+		"r",
+		".", // default value
+		"source root directory",
+	)
 }
 
 // initConfig reads in config file and ENV variables if set.
