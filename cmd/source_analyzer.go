@@ -16,6 +16,7 @@ type SourceAnalyzer struct {
 	importPathPrefix     string
 	rootDir              string
 	excludedChangedFiles []string
+	excludedRootFolders  []string
 }
 
 func NewSourceAnalyzer(rootDir, sourcePathPrefix string) *SourceAnalyzer {
@@ -24,8 +25,8 @@ func NewSourceAnalyzer(rootDir, sourcePathPrefix string) *SourceAnalyzer {
 		rootDir:          rootDir,
 	}
 
-	sourceAnalyzer.excludedChangedFiles = []string{}
-	sourceAnalyzer.excludedChangedFiles = append(sourceAnalyzer.excludedChangedFiles, "test")
+	sourceAnalyzer.excludedChangedFiles = []string{"test"}
+	sourceAnalyzer.excludedRootFolders = []string{"vendor", "third_party", "sql", "bin"}
 
 	return sourceAnalyzer
 }
@@ -101,23 +102,12 @@ func (sa *SourceAnalyzer) getChangedPackages(changedFiles []string) []string {
 	return changedPackagesList
 }
 
-func (sa *SourceAnalyzer) isChangedFileExcluded(file string) bool {
-	for _, exFile := range sa.excludedChangedFiles {
-		if exFile == file {
-			return true
-		}
-	}
-	return false
-}
-
 func (sa *SourceAnalyzer) getSourceGoFiles() []string {
 	var goFiles []string
 	err := filepath.Walk(sa.rootDir, func(path string, info os.FileInfo, err error) error {
-		if strings.HasPrefix(path, "vendor") {
+		if sa.isRootFolderExcluded(path) {
 			return nil
 		}
-		// TODO: other dirs like bin, third_party, etc ...
-
 		if filepath.Ext(path) != ".go" {
 			return nil
 		}
@@ -128,6 +118,24 @@ func (sa *SourceAnalyzer) getSourceGoFiles() []string {
 		panic(err)
 	}
 	return goFiles
+}
+
+func (sa *SourceAnalyzer) isChangedFileExcluded(file string) bool {
+	for _, exFile := range sa.excludedChangedFiles {
+		if exFile == file {
+			return true
+		}
+	}
+	return false
+}
+
+func (sa *SourceAnalyzer) isRootFolderExcluded(rootFolderPath string) bool {
+	for _, f := range sa.excludedRootFolders {
+		if strings.HasPrefix(rootFolderPath, sa.rootDir+"/"+f) {
+			return true
+		}
+	}
+	return false
 }
 
 func (sa *SourceAnalyzer) getDependentPackages(changedPackages []string, goSources []string) []string {
