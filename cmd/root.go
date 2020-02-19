@@ -70,8 +70,6 @@ func Execute() {
 		log.Fatal("invalid root dir")
 	}
 
-	rootDir = "/Users/serj/go/src/github.com/adjust/backend"
-
 	fmt.Print("source path prefix: \t")
 	fmt.Printf(RedPrint+"\n", importPathPrefix)
 	fmt.Print("root dir: \t\t")
