@@ -45,18 +45,20 @@ var (
 		Use:   "sourcescope",
 		Short: "Find the list of packages in need for testing",
 		Long:  `Analyze go project for any changes and output the list of packages that require testing, depending on those changes (for GIT repos)`,
-		// Uncomment the following line if your bare application
-		// has an action associated with it:
-		//	Run: func(cmd *cobra.Command, args []string) { },
 	}
 )
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	if helpFlag := rootCmd.Flag("help"); helpFlag != nil && helpFlag.Value.String() == "true" {
+		if err := rootCmd.Usage(); err != nil {
+			panic(err)
+		}
+		os.Exit(0)
 	}
 
 	if rootDir == "." {
@@ -98,14 +100,15 @@ func Execute() {
 
 func init() {
 	cobra.OnInitialize(initConfig)
-	rootCmd.PersistentFlags().StringVarP(
+	flags := rootCmd.Flags()
+	flags.StringVarP(
 		&importPathPrefix,
 		"prefix",
 		"p",
 		"github.com/adjust/backend", // default value
 		"import path prefix (e.g. github.com/username/projectname), needed when determining if changed packages are being imported in others",
 	)
-	rootCmd.PersistentFlags().StringVarP(
+	flags.StringVarP(
 		&rootDir,
 		"rootdir",
 		"r",
