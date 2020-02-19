@@ -25,6 +25,14 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	BlackPrint  = "\033[1;30m%s\033[0m"
+	RedPrint    = "\033[1;31m%s\033[0m"
+	GreenPrint  = "\033[1;32m%s\033[0m"
+	YellowPrint = "\033[1;33m%s\033[0m"
+	WhitePrint  = "\033[1;37m%s\033[0m"
+)
+
 var (
 	sourceAnalyzer *SourceAnalyzer
 
@@ -36,7 +44,7 @@ var (
 	rootCmd = &cobra.Command{
 		Use:   "sourcescope",
 		Short: "Find the list of packages in need for testing",
-		Long:  `Analyze backend source for any changes and output the list of packages that require testing, depending on those changes`,
+		Long:  `Analyze go project for any changes and output the list of packages that require testing, depending on those changes (for GIT repos)`,
 		// Uncomment the following line if your bare application
 		// has an action associated with it:
 		//	Run: func(cmd *cobra.Command, args []string) { },
@@ -64,8 +72,10 @@ func Execute() {
 
 	rootDir = "/Users/serj/go/src/github.com/adjust/backend"
 
-	fmt.Println("source path prefix: \t" + importPathPrefix)
-	fmt.Println("root dir: \t\t" + rootDir)
+	fmt.Print("source path prefix: \t")
+	fmt.Printf(RedPrint+"\n", importPathPrefix)
+	fmt.Print("root dir: \t\t")
+	fmt.Printf(RedPrint+"\n", rootDir)
 	fmt.Println()
 
 	sourceAnalyzer = NewSourceAnalyzer(rootDir, importPathPrefix)
@@ -73,19 +83,18 @@ func Execute() {
 	changedPackages, dependentPackages := sourceAnalyzer.GetChangedAndDependentSources()
 	dependentPackagesRootFolders := sourceAnalyzer.GetRootFolders(dependentPackages)
 
-	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> changed packages:")
+	fmt.Printf("\n"+RedPrint+"\n", " >>>>>>>>>>>>>>>>>>>>>>>>>> changed packages:")
 	for _, p := range changedPackages {
 		fmt.Println("*** " + p)
 	}
-	fmt.Println()
-	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> dependent packages:")
+	fmt.Printf("\n"+RedPrint+"\n", " >>>>>>>>>>>>>>>>>>>>>>>>>> dependent packages:")
 	for _, p := range dependentPackages {
 		fmt.Println("+++ " + p)
 	}
-	fmt.Println()
-	fmt.Println(" >>>>>>>>>>>>>>>>>>>>>>>>>> dependent packages root folders:")
+	fmt.Printf("\n"+RedPrint+"\n", " >>>>>>>>>>>>>>>>>>>>>>>>>> dependent packages root folders:")
 	for _, f := range dependentPackagesRootFolders {
-		fmt.Println("### " + f)
+		fmt.Print("### ")
+		fmt.Printf(GreenPrint+"\n", f)
 	}
 }
 
