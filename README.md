@@ -9,4 +9,6 @@ Useful when having to determine the list of packages that have to be unit tested
 
 3. `cd` into desired golang project dir, and run `sourcescope`
 
+For more info detailed usage info, use `-h` / `--help` flags
+
 Outputs the list of packages which depend on all files being changed in current `branch` 
